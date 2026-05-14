@@ -1,0 +1,81 @@
+select * from Turismo95.chegadas_1995 limit 1;
+select * from Turismo95.chegadas_1996 limit 1;
+
+--JOIN
+CREATE OR REPLACE VIEW `turismo9596.Turismo95.v_comparativo_chegadas` AS
+SELECT 
+    COALESCE(a.`Via_de_acesso`, b.`Via_de_acesso`) AS Via_de_acesso,
+    COALESCE(a.Mes, b.Mes) AS Mes,
+    COALESCE(a.Pais, b.Pais) AS Pais,
+    COALESCE(a.UF, b.UF) AS UF,
+    IFNULL(a.Chegadas, 0) AS chegadas_1995,
+    IFNULL(b.Chegadas, 0) AS chegadas_1996,
+    CASE 
+        WHEN COALESCE(a.UF, b.UF) IN ('Santa Catarina', 'Rio Grande do Sul', 'Paraná') THEN 'Sul'
+        ELSE 'Outras' 
+    END AS Regiao
+FROM `turismo9596.Turismo95.chegadas_1995` AS a
+FULL OUTER JOIN `turismo9596.Turismo95.chegadas_1996` AS b
+    ON a.Pais = b.Pais 
+    AND a.UF = b.UF 
+    AND a.`Via_de_acesso` = b.`Via_de_acesso` 
+    AND a.Mes = b.Mes;
+SELECT * FROM `turismo9596.Turismo95.v_comparativo_chegadas` LIMIT 1;
+
+-- De onde veio a maioria dos turistas a cada ano?
+SELECT Pais, '1995' AS Ano, Chegadas FROM `turismo9596.Turismo95.chegadas_1995`
+UNION ALL
+SELECT Pais, '1996' AS Ano, Chegadas FROM `turismo9596.Turismo95.chegadas_1996`;
+
+-- Quais os 5 destinos mais populares?
+SELECT 
+    UF, 
+    SUM(chegadas_1995) AS Total_1995, 
+    SUM(chegadas_1996) AS Total_1996,
+    ROW_NUMBER() OVER (ORDER BY SUM(chegadas_1995) DESC) AS ranking_destino
+FROM turismo9596.Turismo95.v_comparativo_chegadas
+GROUP BY UF
+limit 5;
+
+-- Quais as tres vias de acesso mais populares?
+SELECT 
+    Via_de_acesso, 
+    SUM(chegadas_1995) AS Total_1995, 
+    SUM(chegadas_1996) AS Total_1996,
+    ROW_NUMBER() OVER (ORDER BY SUM(chegadas_1995) DESC) AS ranking_acesso
+FROM turismo9596.Turismo95.v_comparativo_chegadas
+GROUP BY `Via_de_acesso`
+limit 3;
+
+-- Quais os meses em que São Paulo recebeu mais turistas fora do Carnaval wm 1995? E em 1996?
+SELECT 
+    Mes, 
+    SUM(chegadas_1995) AS Total_1995, 
+    ROW_NUMBER() OVER (ORDER BY SUM(chegadas_1995) DESC) AS ranking_meses_1995
+FROM turismo9596.Turismo95.v_comparativo_chegadas
+WHERE UF = 'Sao Paulo'
+AND Mes NOT IN ('fevereiro', 'março')
+GROUP BY Mes, UF
+LIMIT 5;
+
+SELECT 
+    Mes, 
+    SUM(chegadas_1995) AS Total_1996, 
+    ROW_NUMBER() OVER (ORDER BY SUM(chegadas_1996) DESC) AS ranking_meses_1996
+FROM turismo9596.Turismo95.v_comparativo_chegadas
+WHERE UF = 'Sao Paulo'
+AND Mes NOT IN ('fevereiro', 'março')
+GROUP BY Mes, UF
+LIMIT 5;
+
+-- Qual a via de acesso menos popular entre aqueles que visitaram o sul do Brasil?
+SELECT 
+    `Via_de_acesso`, 
+    SUM(chegadas_1995) AS Total_1995, 
+    SUM(chegadas_1996) AS Total_1996,
+    ROW_NUMBER() OVER (ORDER BY SUM(chegadas_1995) DESC) AS ranking_via_sul
+FROM turismo9596.Turismo95.v_comparativo_chegadas
+WHERE UF IN ('Parana', 'Rio Grande do Sul', 'Santa Catarina')
+GROUP BY `Via_de_acesso`, UF
+ORDER BY Total_1995 ASC
+LIMIT 1;
