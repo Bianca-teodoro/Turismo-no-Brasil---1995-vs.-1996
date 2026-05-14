@@ -1,0 +1,17 @@
+from google.colab import auth
+auth.authenticate_user()
+
+project_id = 'turismo9596'
+
+from google.cloud import bigquery
+import pandas as pd
+
+client = bigquery.Client(project=project_id, location='southamerica-east1')
+
+sql = "SELECT * FROM `turismo9596.Turismo95.v_comparativo_chegadas`"
+
+df = client.query(sql).to_dataframe()
+
+df.head()
+
+df.to_csv('dados_turismo_dashboard.csv', index=False)
