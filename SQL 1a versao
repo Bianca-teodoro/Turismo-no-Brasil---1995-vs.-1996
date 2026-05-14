@@ -1,0 +1,104 @@
+create database carnaval95_96;
+use carnaval95_96;
+select * from chegadas_1995 limit 1;
+select * from chegadas_1996 limit 1;
+
+-- União dos dados de 1995 e 1996
+CREATE VIEW v_comparativo_chegadas AS
+SELECT 
+    COALESCE(a.País, b.País) AS Pais,
+    COALESCE(a.UF, b.UF) AS UF,
+    COALESCE(a.`Via de acesso`, b.`Via de acesso`) AS Via_Acesso,
+    COALESCE(a.Mês, b.Mês) AS Mes,
+    IFNULL(a.Chegadas, 0) AS Chegadas_1995,
+    IFNULL(b.Chegadas, 0) AS Chegadas_1996,
+    -- Evolução Absoluta
+    (IFNULL(b.Chegadas, 0) - IFNULL(a.Chegadas, 0)) AS Evolucao_Absoluta,
+    -- Evolução Percentual com tratamento de erro
+    CASE 
+        WHEN IFNULL(a.Chegadas, 0) = 0 THEN NULL 
+        ELSE ROUND(((IFNULL(b.Chegadas, 0) - a.Chegadas) / a.Chegadas) * 100, 2)
+    END AS Evolucao_Percentual
+FROM chegadas_1995 a
+LEFT JOIN chegadas_1996 b ON 
+    a.País = b.País AND a.UF = b.UF AND a.`Via de acesso` = b.`Via de acesso` AND a.Mês = b.Mês
+UNION
+SELECT 
+    COALESCE(a.País, b.País) AS Pais,
+    COALESCE(a.UF, b.UF) AS UF,
+    COALESCE(a.`Via de acesso`, b.`Via de acesso`) AS Via_Acesso,
+    COALESCE(a.Mês, b.Mês) AS Mes,
+    IFNULL(a.Chegadas, 0) AS Chegadas_1995,
+    IFNULL(b.Chegadas, 0) AS Chegadas_1996,
+    (IFNULL(b.Chegadas, 0) - IFNULL(a.Chegadas, 0)) AS Evolucao_Absoluta,
+    CASE 
+        WHEN IFNULL(a.Chegadas, 0) = 0 THEN NULL 
+        ELSE ROUND(((IFNULL(b.Chegadas, 0) - a.Chegadas) / a.Chegadas) * 100, 2)
+    END AS Evolucao_Percentual
+FROM chegadas_1995 a
+RIGHT JOIN chegadas_1996 b ON 
+    a.País = b.País AND a.UF = b.UF AND a.`Via de acesso` = b.`Via de acesso` AND a.Mês = b.Mês;
+    
+    select * from v_comparativo_chegadas limit 1;
+-- De onde veio a maioria dos turistas a cada ano?
+SELECT 
+    Pais, 
+    SUM(Chegadas_1995) AS Total_1995, 
+    SUM(Chegadas_1996) AS Total_1996
+FROM v_comparativo_chegadas
+GROUP BY Pais
+ORDER BY Total_1995 DESC
+LIMIT 10;
+
+-- Quais os 5 destinos mais populares?
+SELECT 
+    UF, 
+    SUM(Chegadas_1995) AS Total_1995, 
+    SUM(Chegadas_1996) AS Total_1996,
+    ROW_NUMBER() OVER (ORDER BY SUM(Chegadas_1995) DESC) AS ranking_destino
+FROM v_comparativo_chegadas
+GROUP BY UF
+limit 5;
+
+-- Quais as três vias de acesso mais populares?
+SELECT 
+    Via_Acesso, 
+    SUM(Chegadas_1995) AS Total_1995, 
+    SUM(Chegadas_1996) AS Total_1996,
+    ROW_NUMBER() OVER (ORDER BY SUM(Chegadas_1995) DESC) AS ranking_acesso
+FROM v_comparativo_chegadas
+GROUP BY Via_Acesso
+limit 5;
+
+-- Quais os meses em que São Paulo recebeu mais turistas fora do Carnaval em 1995? E em 1996?
+SELECT 
+    Mes, 
+    SUM(Chegadas_1995) AS Total_1995, 
+    ROW_NUMBER() OVER (ORDER BY SUM(Chegadas_1995) DESC) AS ranking_meses_1995
+FROM v_comparativo_chegadas
+WHERE UF = 'São Paulo'
+AND Mes NOT IN ('fevereiro', 'março')
+GROUP BY Mes, UF
+LIMIT 5;
+
+SELECT 
+    Mes, 
+    SUM(Chegadas_1995) AS Total_1996, 
+    ROW_NUMBER() OVER (ORDER BY SUM(Chegadas_1996) DESC) AS ranking_meses_1996
+FROM v_comparativo_chegadas
+WHERE UF = 'São Paulo'
+AND Mes NOT IN ('fevereiro', 'março')
+GROUP BY Mes, UF
+LIMIT 5;
+
+-- Qual a via de acesso menos popular entre aqueles que visitaram o sul do Brasil?
+SELECT 
+    Via_Acesso, 
+    SUM(Chegadas_1995) AS Total_1995, 
+    SUM(Chegadas_1996) AS Total_1996,
+    ROW_NUMBER() OVER (ORDER BY SUM(Chegadas_1995) DESC) AS ranking_via_sul
+FROM v_comparativo_chegadas
+WHERE UF IN ('Paraná', 'Rio Grande do Sul', 'Santa Catarina')
+GROUP BY Via_Acesso, UF
+ORDER BY Total_1995 ASC
+LIMIT 1;
